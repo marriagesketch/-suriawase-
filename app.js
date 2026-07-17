@@ -7,7 +7,7 @@
    （URLの # 以降はブラウザからサーバーへ送信されないため）。
    ============================================================ */
 
-const LIFF_ID   = "2010606376-K7UukyKB";
+const LIFF_ID   = "2010606389-v29ZSV0f";
 const DRAFT_KEY = "konkatsu_suriawase_draft_v1";
 
 // ▼▼▼ デプロイ済みGAS Web AppのURL ▼▼▼
