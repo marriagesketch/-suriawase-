@@ -7,7 +7,7 @@
    （URLの # 以降はブラウザからサーバーへ送信されないため）。
    ============================================================ */
 
-const LIFF_ID   = "2010606389-v29ZSV0f";
+const LIFF_ID   = "2010606376-K7UukyKB";
 const DRAFT_KEY = "konkatsu_suriawase_draft_v1";
 
 // ▼▼▼ デプロイ済みGAS Web AppのURL ▼▼▼
@@ -921,7 +921,7 @@ function renderViewMode(data, options = {}) {
      画像は1MB以下を推奨。PNGの透過部分はそのまま送ると
      反映されない場合があるため、白背景に合成したJPEGを使用する。
    ============================================================ */
-const HEADER_IMAGE_URL = "https://marriagesketch.github.io/-suriawase-/image_message.jpg";
+const HEADER_IMAGE_URL = "https://marriagesketch.github.io/-suriawase/image_message.jpg";
 
 function buildShareFlexMessage(shareName, shareURL) {
   const nameLine = shareName ? `${shareName}さんの回答が届きました` : "回答が届きました";
@@ -1017,6 +1017,25 @@ async function checkFriendship() {
    メイン処理
    ============================================================ */
 (async () => {
+
+  /* ----- 下書き移行受け取り（旧URLからの移行リンク経由） -----
+     旧URL（migrate.html）から ?migrate=1#<Base64URLエンコードされた下書きJSON>
+     の形でリダイレクトされてきた場合、localStorageに保存する。
+     LIFF初期化より前に行うことで、通信なしで即座に処理する。
+  ----- */
+  if (new URLSearchParams(location.search).get("migrate") === "1" && location.hash) {
+    try {
+      const encoded = location.hash.slice(1);
+      const decoded = new TextDecoder().decode(base64UrlToBuf(encoded));
+      localStorage.setItem(DRAFT_KEY, decoded);
+      alert("下書きデータの移行が完了しました。");
+    } catch (e) {
+      console.error("draft migration failed", e);
+      alert("下書きデータの移行に失敗しました。お手数ですが運営までご連絡ください。");
+    }
+    // URLをきれいにする（migrateパラメータとhashを除去）
+    history.replaceState(null, "", location.origin + location.pathname);
+  }
 
   /* ----- LIFF 初期化（必ず最初に1回だけ実行） -----
      共有リンク判定に使うURL（?id=...#key）の読み取りは、
