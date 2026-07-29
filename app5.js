@@ -1043,28 +1043,53 @@ async function checkFriendship() {
 }
 
 /* ============================================================
+   複数アプリ一括下書き移行チェーン 受け取り処理
+   （婚活すり合わせシリーズ 5サイト共通スニペット。中身は全サイト同一）
+   ============================================================ */
+(function () {
+  const params = new URLSearchParams(location.search);
+  if (params.get("migrate") !== "1" || !location.hash) return;
+
+  window.__migrationInProgress = true;
+
+  try {
+    const idx = parseInt(params.get("idx") || "0", 10);
+    const encoded = location.hash.slice(1);
+    const binary = atob(encoded.replace(/-/g, "+").replace(/_/g, "/"));
+    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+    const chain = JSON.parse(new TextDecoder().decode(bytes));
+
+    const item = chain[idx];
+    if (item && item.value != null) {
+      localStorage.setItem(item.draftKey, item.value);
+    }
+
+    const next = chain[idx + 1];
+    if (next) {
+      // まだ移行先が残っている → 次のサイトへ自動遷移
+      location.href = `${next.targetOrigin}?migrate=1&idx=${idx + 1}#${encoded}`;
+    } else {
+      // チェーンの最後 = 全件移行完了
+      alert("下書きデータの移行がすべて完了しました。");
+      history.replaceState(null, "", location.origin + location.pathname);
+      window.__migrationInProgress = false;
+    }
+  } catch (e) {
+    console.error("draft migration failed", e);
+    alert("下書きデータの移行中にエラーが発生しました。お手数ですが運営までご連絡ください。");
+    history.replaceState(null, "", location.origin + location.pathname);
+    window.__migrationInProgress = false;
+  }
+})();
+
+/* ============================================================
    メイン処理
    ============================================================ */
 (async () => {
 
-  /* ----- 下書き移行受け取り（旧URLからの移行リンク経由） -----
-     旧URL（migrate.html）から ?migrate=1#<Base64URLエンコードされた下書きJSON>
-     の形でリダイレクトされてきた場合、localStorageに保存する。
-     LIFF初期化より前に行うことで、通信なしで即座に処理する。
-  ----- */
-  if (new URLSearchParams(location.search).get("migrate") === "1" && location.hash) {
-    try {
-      const encoded = location.hash.slice(1);
-      const decoded = new TextDecoder().decode(base64UrlToBuf(encoded));
-      localStorage.setItem(DRAFT_KEY, decoded);
-      alert("下書きデータの移行が完了しました。");
-    } catch (e) {
-      console.error("draft migration failed", e);
-      alert("下書きデータの移行に失敗しました。お手数ですが運営までご連絡ください。");
-    }
-    // URLをきれいにする（migrateパラメータとhashを除去）
-    history.replaceState(null, "", location.origin + location.pathname);
-  }
+  // 移行チェーンの転送中（次サイトへの中継のみ）は、
+  // 通常のLIFF初期化・アプリ本処理を一切実行しない
+  if (window.__migrationInProgress) return;
 
   /* ----- LIFF 初期化（必ず最初に1回だけ実行） -----
      共有リンク判定に使うURL（?id=...#key）の読み取りは、
