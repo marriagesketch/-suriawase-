@@ -60,8 +60,14 @@ var INTERNAL_SECRET    = PropertiesService.getScriptProperties().getProperty('IN
    ・ everPartnered: true（かつ active:false）→ 過去に交際していたが現在は
      パートナー不在（交際終了後など）。本人以外は誰にも見せない。
    ・ 両方 false → 従来通り「初回閲覧者固定」ロジックを使う
-   結果は120秒キャッシュし、Partners API不通時は「everPartnered:false」
-   として従来ロジックにフォールバックする（閲覧を過剰にブロックしないため）。 */
+   結果は900秒（15分）キャッシュし、Partners API不通時は「everPartnered:false」
+   として従来ロジックにフォールバックする（閲覧を過剰にブロックしないため）。
+   ※以前は120秒キャッシュだったため、閲覧のたびに別GASへの外部fetchが頻発し、
+     それがコールドスタート等と重なって体感速度を落とす主因になっていた。
+     交際ステータスはリアルタイム性がそこまで重要ではないため、キャッシュを
+     延ばして外部呼び出し頻度を大きく減らす。 */
+var PARTNER_STATUS_CACHE_SECONDS = 900;
+
 function getPartnerStatus(ownerHash) {
   var cache = CacheService.getScriptCache();
   var cacheKey = 'partner_' + ownerHash;
@@ -85,7 +91,7 @@ function getPartnerStatus(ownerHash) {
   } catch (err) {
     Logger.log('getPartnerStatus failed: ' + err);
   }
-  cache.put(cacheKey, JSON.stringify(result), 120);
+  cache.put(cacheKey, JSON.stringify(result), PARTNER_STATUS_CACHE_SECONDS);
   return result;
 }
 
@@ -161,15 +167,13 @@ function handleShare(body) {
     var analyticsSheet = ss.getSheetByName(ANALYTICS_SHEET);
     var now = new Date();
 
-    removePreviousShares(sharesSheet, ownerHash);
-    removePreviousAnalytics(analyticsSheet, ownerHash);
-
-    sharesSheet.appendRow([
+    var shareRow = [
       id, cipherText, '', ownerHash, '', 'active', SCHEMA_VERSION,
       now, now, '', '', 0
-    ]);
+    ];
+    upsertUnviewedShareRow(sharesSheet, ownerHash, shareRow);
 
-    analyticsSheet.appendRow([
+    var analyticsRow = [
       id, ownerHash, '', now,
       '', '', '', '', // SERIOUS_RELATIONSHIP_STATUS / PARTNER_HASH / STARTED_AT / ENDED_AT（初期値は空）
       analytics.q1 || '', analytics.q2 || '', analytics.q3 || '',
@@ -192,7 +196,8 @@ function handleShare(body) {
       analytics.q33 || '', analytics.q34 || '', analytics.q35 || '',
       analytics.q36 || '', analytics.q37 || '', analytics.q38 || '',
       analytics.q39 || '', analytics.q40 || '', analytics.q41 || ''
-    ]);
+    ];
+    upsertAnalyticsRow(analyticsSheet, ownerHash, analyticsRow);
 
     return jsonResponse({ ok: true, id: id });
   } finally {
@@ -200,34 +205,45 @@ function handleShare(body) {
   }
 }
 
-/* 同じ ownerHash の既存 Shares 行のうち、まだ誰にも開かれていない
-   （VIEWER_HASH が空の）行だけを削除する。
-   ・誰にも開かれていない行 → 上書き対象として削除（この後 appendRow で作り直す）
-   ・すでに誰かが開いた行   → 履歴として残す（削除しない）
+/* 同じ ownerHash の Shares 行のうち、まだ誰にも開かれていない
+   （VIEWER_HASH が空の）行があれば、その行をそのまま上書きする
+   （＝1回のsetValuesで完結。deleteRow+appendRowより大幅に軽い）。
+   該当行が無ければ新規行として追加する。
+   ・誰にも開かれていない行 → 上書き対象
+   ・すでに誰かが開いた行   → 履歴として残す（対象にしない）
    これにより「最初に誰かが開くまでは上書き、開いたら次は新規行」という
-   挙動になる。 */
-function removePreviousShares(sheet, ownerHash) {
+   挙動は変えずに、行の削除・シフトを発生させない。
+   ※通常運用では該当行は0または1件のみのはず（複数残る場合は最初の
+     1件だけを上書きし、残りは履歴として残る）。 */
+function upsertUnviewedShareRow(sheet, ownerHash, rowValues) {
   var lastRow = sheet.getLastRow();
-  if (lastRow < DATA_START_ROW) return;
-  var values = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, COL.VIEWER_HASH).getValues();
-  for (var i = values.length - 1; i >= 0; i--) {
-    var rowOwnerHash  = values[i][COL.OWNER_HASH - 1];
-    var rowViewerHash = values[i][COL.VIEWER_HASH - 1];
-    if (rowOwnerHash === ownerHash && !rowViewerHash) {
-      sheet.deleteRow(DATA_START_ROW + i);
+  var targetRow = null;
+  if (lastRow >= DATA_START_ROW) {
+    var values = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, COL.VIEWER_HASH).getValues();
+    for (var i = 0; i < values.length; i++) {
+      var rowOwnerHash  = values[i][COL.OWNER_HASH - 1];
+      var rowViewerHash = values[i][COL.VIEWER_HASH - 1];
+      if (rowOwnerHash === ownerHash && !rowViewerHash) {
+        targetRow = DATA_START_ROW + i;
+        break;
+      }
     }
+  }
+  if (targetRow) {
+    sheet.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);
+  } else {
+    sheet.appendRow(rowValues);
   }
 }
 
-/* 同じ ownerHash の既存 Analytics 行を削除する（完全上書き・1人1行に統一） */
-function removePreviousAnalytics(sheet, ownerHash) {
-  var lastRow = sheet.getLastRow();
-  if (lastRow < DATA_START_ROW) return;
-  var values = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, ACOL.OWNER_HASH).getValues();
-  for (var i = values.length - 1; i >= 0; i--) {
-    if (values[i][ACOL.OWNER_HASH - 1] === ownerHash) {
-      sheet.deleteRow(DATA_START_ROW + i);
-    }
+/* 同じ ownerHash の既存 Analytics 行があれば上書きし、無ければ新規追加する
+   （完全上書き・1人1行に統一。deleteRowは使わない）。 */
+function upsertAnalyticsRow(sheet, ownerHash, rowValues) {
+  var targetRow = findAnalyticsRowByOwnerHash(sheet, ownerHash);
+  if (targetRow) {
+    sheet.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);
+  } else {
+    sheet.appendRow(rowValues);
   }
 }
 
