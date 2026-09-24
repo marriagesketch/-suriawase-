@@ -911,7 +911,7 @@ function renderViewMode(data, options = {}) {
 
     ${!selfPreview ? `
     <div class="cta-card">
-      <img src="shareimage.PNG" class="cta-image-left" alt="">
+      <img src="shareimage.webp" class="cta-image-left" alt="">
       <div class="cta-content">
         <h3 class="cta-title">あなたの価値観も共有してみませんか？</h3>
         <p class="cta-text">
@@ -955,7 +955,7 @@ function renderViewMode(data, options = {}) {
      呼び出し元で従来のURLスキーム方式にフォールバックする。
    ※ hero画像のURLは、LINEのサーバーから読み込める公開HTTPS URL
      である必要がある（ローカルパスや相対パスは不可）。
-     画像は1MB以下を推奨。PNGの透過部分はそのまま送ると
+     画像は1MB以下を推奨。webpの透過部分はそのまま送ると
      反映されない場合があるため、白背景に合成したJPEGを使用する。
    ============================================================ */
 const HEADER_IMAGE_URL = "https://marriagesketch.github.io/-suriawase-/image_message.jpg";
