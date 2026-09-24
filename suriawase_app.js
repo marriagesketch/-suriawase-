@@ -7,8 +7,9 @@
    （URLの # 以降はブラウザからサーバーへ送信されないため）。
    ============================================================ */
 
-const LIFF_ID   = "2010606376-K7UukyKB";
+const LIFF_ID   = "2010312230-eMR5533o";
 const DRAFT_KEY = "konkatsu_suriawase_draft";
+const PENDING_SHARED_VIEW_KEY = "konkatsu_suriawase_pending_shared_view";
 
 // ▼▼▼ デプロイ済みGAS Web AppのURL ▼▼▼
 const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbzyvzON4-aCxsV1T37MZhDpIvHj-bGhC2ODfHiSgRifompdUN7o_XYivh2VErYMm-v0/exec";
@@ -681,6 +682,13 @@ async function handleSharedView(id) {
   }
 
   if (!liff.isLoggedIn()) {
+    // LINEログイン画面へ遷移する前に、共有リンク情報（id・復号鍵）を
+    // sessionStorageへ退避しておく。ログイン往復後にURLの
+    // ?id=...#鍵 が正しく復元されないブラウザ・状況があり、その場合に
+    // 自分の回答フォーム側へ誤って遷移してしまう不具合の対策。
+    try {
+      sessionStorage.setItem(PENDING_SHARED_VIEW_KEY, location.href);
+    } catch (_) {}
     liff.login();
     return;
   }
@@ -903,7 +911,7 @@ function renderViewMode(data, options = {}) {
 
     ${!selfPreview ? `
     <div class="cta-card">
-      <img src="image1.PNG" class="cta-image-left" alt="">
+      <img src="shareimage.webp" class="cta-image-left" alt="">
       <div class="cta-content">
         <h3 class="cta-title">あなたの価値観も共有してみませんか？</h3>
         <p class="cta-text">
@@ -947,10 +955,10 @@ function renderViewMode(data, options = {}) {
      呼び出し元で従来のURLスキーム方式にフォールバックする。
    ※ hero画像のURLは、LINEのサーバーから読み込める公開HTTPS URL
      である必要がある（ローカルパスや相対パスは不可）。
-     画像は1MB以下を推奨。PNGの透過部分はそのまま送ると
+     画像は1MB以下を推奨。webpの透過部分はそのまま送ると
      反映されない場合があるため、白背景に合成したJPEGを使用する。
    ============================================================ */
-const HEADER_IMAGE_URL = "https://marriagesketch.github.io/-suriawase-/image_message.jpg";
+const SHARETARGETPICKER_IMAGE_URL = "https://marriagesketch.github.io/-suriawase-/sharetargetpicker.jpg";
 
 function buildShareFlexMessage(shareName, shareURL) {
   const nameLine = shareName ? `${shareName}さんの回答が届きました` : "回答が届きました";
@@ -962,7 +970,7 @@ function buildShareFlexMessage(shareName, shareURL) {
       type: "bubble",
       hero: {
         type: "image",
-        url: HEADER_IMAGE_URL,
+        url: SHARETARGETPICKER_IMAGE_URL,
         size: "full",
         aspectRatio: "3:2",
         aspectMode: "cover"
@@ -995,6 +1003,71 @@ function buildShareFlexMessage(shareName, shareURL) {
       }
     }
   };
+}
+
+/* ------------------------------------------------------------
+   LINEユーザーIDの取得
+   liff.getProfile() はLINEサーバーへの追加API呼び出しが必要で、
+   ログイン直後などタイミングによって不安定になりやすい。
+   ログイン時に発行されるIDトークンをその場でデコードするだけなら
+   通信が発生せず、ユーザーID（sub）を安定して取得できる。
+   表示名・プロフィール画像は使わない設計なので、これで十分。
+   ------------------------------------------------------------ */
+function getLineUserId() {
+  const idToken = liff.getDecodedIDToken();
+  if (!idToken || !idToken.sub) {
+    throw new Error("ID token is not available (sub claim missing)");
+  }
+  return idToken.sub;
+}
+
+/* ------------------------------------------------------------
+   スクショ抑止用ウォーターマーク
+   ------------------------------------------------------------
+   Webアプリの仕様上、スクリーンショットの撮影自体を検知・
+   ブロックすることはできない。そのため「撮られても、誰が・いつ
+   閲覧した画面かが写り込む」ようにし、無断転載・拡散への
+   心理的な抑止力として機能させる。
+   閲覧者のLINEユーザーIDハッシュ（先頭8文字）と閲覧日時を、
+   画面全体に薄く敷き詰めて表示する。position:fixedのため
+   スクロールしても常に画面上に留まる。
+   ------------------------------------------------------------ */
+function buildWatermarkSVG(lines) {
+  const tileW = 240, tileH = 140;
+  const lineHeight = 16;
+  const startY = tileH / 2 - ((lines.length - 1) * lineHeight) / 2;
+
+  const textEls = lines.map((line, i) => {
+    const y = startY + i * lineHeight;
+    return `<text x="0" y="${y}" font-size="12" font-family="sans-serif" ` +
+           `fill="rgba(0,0,0,0.1)" transform="rotate(-28 ${tileW / 2} ${tileH / 2})">${escapeHTML(line)}</text>`;
+  }).join("");
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${tileW}" height="${tileH}">${textEls}</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function showScreenshotWatermark(viewerHash) {
+  const el = document.getElementById("screenshotWatermark");
+  if (!el) return;
+  const stamp = new Date().toLocaleString("ja-JP", {
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  });
+  const lines = [
+    "スクショ・転載禁止",
+    `${viewerHash.slice(0, 8)}  ${stamp}`,
+  ];
+  el.style.backgroundImage = `url("${buildWatermarkSVG(lines)}")`;
+  el.classList.add("show");
+}
+
+function escapeHTML(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 /* ============================================================
@@ -1043,28 +1116,53 @@ async function checkFriendship() {
 }
 
 /* ============================================================
+   複数アプリ一括下書き移行チェーン 受け取り処理
+   （婚活すり合わせシリーズ 5サイト共通スニペット。中身は全サイト同一）
+   ============================================================ */
+(function () {
+  const params = new URLSearchParams(location.search);
+  if (params.get("migrate") !== "1" || !location.hash) return;
+
+  window.__migrationInProgress = true;
+
+  try {
+    const idx = parseInt(params.get("idx") || "0", 10);
+    const encoded = location.hash.slice(1);
+    const binary = atob(encoded.replace(/-/g, "+").replace(/_/g, "/"));
+    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+    const chain = JSON.parse(new TextDecoder().decode(bytes));
+
+    const item = chain[idx];
+    if (item && item.value != null) {
+      localStorage.setItem(item.draftKey, item.value);
+    }
+
+    const next = chain[idx + 1];
+    if (next) {
+      // まだ移行先が残っている → 次のサイトへ自動遷移
+      location.href = `${next.targetOrigin}?migrate=1&idx=${idx + 1}#${encoded}`;
+    } else {
+      // チェーンの最後 = 全件移行完了
+      alert("下書きデータの移行がすべて完了しました。");
+      history.replaceState(null, "", location.origin + location.pathname);
+      window.__migrationInProgress = false;
+    }
+  } catch (e) {
+    console.error("draft migration failed", e);
+    alert("下書きデータの移行中にエラーが発生しました。お手数ですが運営までご連絡ください。");
+    history.replaceState(null, "", location.origin + location.pathname);
+    window.__migrationInProgress = false;
+  }
+})();
+
+/* ============================================================
    メイン処理
    ============================================================ */
 (async () => {
 
-  /* ----- 下書き移行受け取り（旧URLからの移行リンク経由） -----
-     旧URL（migrate.html）から ?migrate=1#<Base64URLエンコードされた下書きJSON>
-     の形でリダイレクトされてきた場合、localStorageに保存する。
-     LIFF初期化より前に行うことで、通信なしで即座に処理する。
-  ----- */
-  if (new URLSearchParams(location.search).get("migrate") === "1" && location.hash) {
-    try {
-      const encoded = location.hash.slice(1);
-      const decoded = new TextDecoder().decode(base64UrlToBuf(encoded));
-      localStorage.setItem(DRAFT_KEY, decoded);
-      alert("下書きデータの移行が完了しました。");
-    } catch (e) {
-      console.error("draft migration failed", e);
-      alert("下書きデータの移行に失敗しました。お手数ですが運営までご連絡ください。");
-    }
-    // URLをきれいにする（migrateパラメータとhashを除去）
-    history.replaceState(null, "", location.origin + location.pathname);
-  }
+  // 移行チェーンの転送中（次サイトへの中継のみ）は、
+  // 通常のLIFF初期化・アプリ本処理を一切実行しない
+  if (window.__migrationInProgress) return;
 
   /* ----- LIFF 初期化（必ず最初に1回だけ実行） -----
      共有リンク判定に使うURL（?id=...#key）の読み取りは、
@@ -1080,8 +1178,28 @@ async function checkFriendship() {
     return;
   }
 
-  /* ----- 共有リンク判定（?id=... が付いている場合） ----- */
-  const sharedId = new URLSearchParams(location.search).get("id");
+  /* ----- 共有リンク判定（?id=... が付いている場合） -----
+     LINEログインへのリダイレクトを経由した直後は、ブラウザや状況に
+     よってURLの ?id=...#鍵 が正しく復元されないことがある。その場合は
+     handleSharedView側でliff.login()前にsessionStorageへ退避しておいた
+     URLから復元する（フォールバック）。 */
+  let sharedId = new URLSearchParams(location.search).get("id");
+  if (!sharedId) {
+    try {
+      const pending = sessionStorage.getItem(PENDING_SHARED_VIEW_KEY);
+      if (pending) {
+        const pendingURL = new URL(pending);
+        const pendingId = new URLSearchParams(pendingURL.search).get("id");
+        if (pendingId) {
+          sharedId = pendingId;
+          const restoredHash = location.hash || pendingURL.hash;
+          history.replaceState(null, "", location.pathname + pendingURL.search + restoredHash);
+        }
+      }
+    } catch (_) {}
+  }
+  try { sessionStorage.removeItem(PENDING_SHARED_VIEW_KEY); } catch (_) {}
+
   if (sharedId) {
     await handleSharedView(sharedId);
     return;
@@ -1092,8 +1210,12 @@ async function checkFriendship() {
     return;
   }
 
-  /* ----- 友だち追加チェック（未追加なら追加ダイアログを表示） ----- */
-  await checkFriendship();
+  /* ----- 友だち追加チェック（未追加なら追加ダイアログを表示） -----
+     liff.getFriendship() / requestFriendship() はLINEサーバーへの通信を
+     伴うため、ここをawaitすると電波が悪い時に画面表示自体が止まって
+     しまう。必須の処理ではないので、裏側で実行させて画面構築は
+     先に進める（fire-and-forget）。 */
+  checkFriendship();
 
   /* ----- ランキングUIの初期化 ----- */
   setupRankingGroup("q19Ranking");
