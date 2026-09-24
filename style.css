@@ -539,3 +539,25 @@ input[type="range"]{
     font-size:18px;
   }
 }
+
+/********************************
+ * スクショ抑止用ウォーターマーク
+ * ・共有リンクを開いた閲覧者の画面にのみ重ねて表示する
+ * ・position:fixedのためスクロールしても常に画面上に留まり、
+ *   端末でスクショを撮ってもウォーターマークごと写り込む
+ * ・pointer-eventsはnoneにして操作の邪魔をしないようにする
+ ********************************/
+
+#screenshotWatermark{
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  pointer-events:none;
+  background-repeat:repeat;
+  background-position:top left;
+}
+
+#screenshotWatermark.show{
+  display:block;
+}
