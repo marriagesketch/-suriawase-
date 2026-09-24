@@ -753,6 +753,7 @@ async function handleSharedView(id) {
   }
 
   renderViewMode(data);
+  showScreenshotWatermark(viewerHash);
 }
 
 /* ============================================================
