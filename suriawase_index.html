@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>婚活 すり合わせ</title>
+<link rel="stylesheet" href="style.css"/>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+</head>
+
+<body>
+<div class="container">
+
+<div class="form-header">
+  <h1>婚活 すり合わせ</h1>
+  <p class="form-description">
+  本サービスは、結婚観、将来観のすり合わせでの使用を目的としています。<br>
+  なお本サービスは、結婚相談所・マッチングアプリ・知人の紹介等ですでに知り合ったお相手との相互理解を深めるための自己開示支援サービスです。新たな出会いは提供しておりません。<br>
+  プライバシー保護：LINE IDはハッシュ化（暗号化）して保存されます。表示名・プロフィール画像・メールアドレスなどは取得されません。<br>
+  再回答について：同じLINEアカウントから回答された場合、以前の内容は上書きされます。</p>
+</div>
+
+<!-- ビューモード表示エリア（共有リンクで開いたとき） -->
+<div id="viewMode"></div>
+
+<!-- スクショ抑止ウォーターマーク（共有リンクの閲覧者にのみ表示） -->
+<div id="screenshotWatermark" aria-hidden="true"></div>
+  
+<!-- Q1 -->
+<label>Q1 結婚したい理由は何ですか？</label>
+<textarea id="q1" class="detail-textarea"></textarea>
+
+<!-- Q2 -->
+<label>Q2 どんな夫婦になりたいですか？理想の夫婦像を教えてください。</label>
+<textarea id="q2" class="detail-textarea"></textarea>
+
+<!-- Q3 -->
+<label>Q3 前科はありますか？</label>
+<label><input type="radio" name="q3" value="a3-1">ある</label>
+<label><input type="radio" name="q3" value="a3-2">ない</label>
+
+<!-- Q4 -->
+<label>Q4 借金はありますか？</label>
+<label><input type="radio" name="q4" value="a4-1">ある（奨学金返済中も含みます）</label>
+<label><input type="radio" name="q4" value="a4-2">ない</label>
+
+<!-- Q5 -->
+<label>Q5 現在、他人の借金の保証人になっていますか？</label>
+<label><input type="radio" name="q5" value="a5-1">なっている</label>
+<label><input type="radio" name="q5" value="a5-2">なっていない</label>
+
+<!-- Q6 -->
+<label>Q6 障害、難病など健康上のことで伝えておくことはありますか？</label>
+<label><input type="radio" name="q6" value="a6-1">ある</label>
+<label><input type="radio" name="q6" value="a6-2">ない</label>
+
+<!-- Q7 -->
+<label>Q7 宗教事情で事前に伝えておくことはありますか？</label>
+<label><input type="radio" name="q7" value="a7-1">ある</label>
+<label><input type="radio" name="q7" value="a7-2">ない(一般的な法事程度であればこちらを選択してください)</label>
+
+<!-- Q8 -->
+<label>Q8 再婚の場合、離婚理由を教えてください。</label>
+<label><input type="radio" name="q8" value="a8-1">初婚</label>
+<label><input type="radio" name="q8" value="a8-2">再婚以上</label>
+<textarea id="q8_other" class="detail-textarea" placeholder="離婚理由" style="display:none"></textarea>
+
+<!-- Q9 -->
+<label>Q9 転勤や転職、起業の予定はありますか？</label>
+<label><input type="radio" name="q9" value="a9-1">ある</label>
+<label><input type="radio" name="q9" value="a9-2">ない</label>
+
+<!-- Q10 -->
+<label>Q10 子どもはほしいですか？ほしい場合は自然妊娠できなかった場合、不妊治療や養子についてチャレンジしたいと考えているものを全て選んでください。</label>
+
+<label>1人目</label>
+<div class="slider-labels">
+  <span>ほしくない</span>
+  <span>ほしい</span>
+</div>
+<input type="range" id="q10_1" min="1" max="5" step="1">
+<label><input type="checkbox" name="q10_1" value="a10_1-1">人工授精などの一般不妊治療</label>
+<label><input type="checkbox" name="q10_1" value="a10_1-2">体外受精・顕微授精などの高度不妊治療</label>
+<label><input type="checkbox" name="q10_1" value="a10_1-3">養子</label>
+<label><input type="checkbox" name="q10_1" value="a10_1-4">自然妊娠のみ、もしくはほしくない</label>
+
+<label>2人目</label>
+<div class="slider-labels">
+  <span>ほしくない</span>
+  <span>ほしい</span>
+</div>
+<input type="range" id="q10_2" min="1" max="5" step="1">
+<label><input type="checkbox" name="q10_2" value="a10_2-1">人工授精などの一般不妊治療</label>
+<label><input type="checkbox" name="q10_2" value="a10_2-2">体外受精・顕微授精などの高度不妊治療</label>
+<label><input type="checkbox" name="q10_2" value="a10_2-3">養子</label>
+<label><input type="checkbox" name="q10_2" value="a10_2-4">自然妊娠のみ、もしくはほしくない</label>
+
+<label>3人目</label>
+<div class="slider-labels">
+  <span>ほしくない</span>
+  <span>ほしい</span>
+</div>
+<input type="range" id="q10_3" min="1" max="5" step="1">
+<label><input type="checkbox" name="q10_3" value="a10_3-1">人工授精などの一般不妊治療</label>
+<label><input type="checkbox" name="q10_3" value="a10_3-2">体外受精・顕微授精などの高度不妊治療</label>
+<label><input type="checkbox" name="q10_3" value="a10_3-3">養子</label>
+<label><input type="checkbox" name="q10_3" value="a10_3-4">自然妊娠のみ、もしくはほしくない</label>
+
+<label>4人目以上</label>
+<div class="slider-labels">
+  <span>ほしくない</span>
+  <span>ほしい</span>
+</div>
+<input type="range" id="q10_4" min="1" max="5" step="1">
+<label><input type="checkbox" name="q10_4" value="a10_4-1">人工授精などの一般不妊治療</label>
+<label><input type="checkbox" name="q10_4" value="a10_4-2">体外受精・顕微授精などの高度不妊治療</label>
+<label><input type="checkbox" name="q10_4" value="a10_4-3">養子</label>
+<label><input type="checkbox" name="q10_4" value="a10_4-4">自然妊娠のみ、もしくはほしくない</label>
+
+<!-- Q11 -->
+<label>Q11 1年以内にブライダルチェックは受けたことがありますか？</label>
+<label><input type="radio" name="q11" value="a11-1">ある</label>
+<label><input type="radio" name="q11" value="a11-2">ない</label>
+
+<!-- Q12 -->
+<label>Q12 結婚後の働き方はどうしたいですか？</label>
+<label><input type="radio" name="q12" value="a12-1">2人ともフルタイム</label>
+<label><input type="radio" name="q12" value="a12-2">自分はフルタイムで働くが相手の働き方は問わない</label>
+<label><input type="radio" name="q12" value="a12-3">自分はフルタイムで働くので相手にはセーブしてほしい</label>
+<label><input type="radio" name="q12" value="a12-4">パートで働きたい</label>
+<label><input type="radio" name="q12" value="a12-5">専業主婦、專業主夫になりたい</label>
+<label><input type="radio" name="q12" value="a12-6">その他</label>
+<textarea id="q12_other" class="detail-textarea" style="display:none"></textarea>
+
+<!-- Q13 -->
+<label>Q13 家事はどう分担したいですか？</label>
+<label><input type="radio" name="q13" value="a13-1">全て積極的にやりたい</label>
+<label><input type="radio" name="q13" value="a13-2">分担したいが好きな家事・得意な家事は積極的にやりたい</label>
+<label><input type="radio" name="q13" value="a13-3">分担したいが帰る時間が自分の方が早ければ平日は積極的にやりたい</label>
+<label><input type="radio" name="q13" value="a13-4">半々にしたい</label>
+<label><input type="radio" name="q13" value="a13-5">平日はほとんどお願いしたいが休日は積極的に行いたい</label>
+<label><input type="radio" name="q13" value="a13-6">ほとんど相手にやってほしい</label>
+<label><input type="radio" name="q13" value="a13-7">その他</label>
+<textarea id="q13_other" class="detail-textarea" style="display:none"></textarea>
+
+<!-- Q14 -->
+<label>Q14 結婚後の支出割合はどうしたいですか？</label>
+<label><input type="radio" name="q14" value="a14-1">共通でかかるお金は自分がほとんど払いたい</label>
+<label><input type="radio" name="q14" value="a14-2">収入差による按分で出し合いたい</label>
+<label><input type="radio" name="q14" value="a14-3">半々で出し合いたい</label>
+<label><input type="radio" name="q14" value="a14-4">共通でかかるお金は相手にほとんど払ってほしい</label>
+<label><input type="radio" name="q14" value="a14-5">その他</label>
+<textarea id="q14_other" class="detail-textarea" style="display:none"></textarea>
+
+<!-- Q15 -->
+<label>Q15 子どもが生まれた後の働き方はどうしたいですか？</label>
+<label><input type="radio" name="q15" value="a15-1">2人ともフルタイム</label>
+<label><input type="radio" name="q15" value="a15-2">自分はフルタイムで働くが相手の働き方は問わない</label>
+<label><input type="radio" name="q15" value="a15-3">自分はフルタイムで働くので相手にはセーブしてほしい</label>
+<label><input type="radio" name="q15" value="a15-4">パートで働きたい</label>
+<label><input type="radio" name="q15" value="a15-5">専業主婦、專業主夫になりたい</label>
+<label><input type="radio" name="q15" value="a15-6">その他</label>
+<textarea id="q15_other" class="detail-textarea" style="display:none"></textarea>
+
+<!-- Q16 -->
+<label>Q16 育児はどう分担したいですか？</label>
+<label><input type="radio" name="q16" value="a16-1">全て積極的にやりたい</label>
+<label><input type="radio" name="q16" value="a16-2">分担したいが子どもの体調不良時などは自分が積極的に面倒をみたい</label>
+<label><input type="radio" name="q16" value="a16-3">分担したいが子どもの体調不良時などは相手にできるだけお願いしたい</label>
+<label><input type="radio" name="q16" value="a16-4">平日はほとんどお願いしたいが休日は積極的に行いたい</label>
+<label><input type="radio" name="q16" value="a16-5">ほとんど相手にやってほしい</label>
+<label><input type="radio" name="q16" value="a16-6">その他</label>
+<textarea id="q16_other" class="detail-textarea" style="display:none"></textarea>
+
+<!-- Q17 -->
+<label>Q17 育休は何ヶ月ぐらい取りたいですか？女性の場合は産後休暇と育休の通算でどれぐらい取りたいか答えてください。なお誕生月は4~12月で保育園は次の4学校に入れる前提で理想的なスケジュールを答えてください。</label>
+<label><input type="radio" name="q17" value="a17-1">1ヶ月以内(女性で会社員であれば選択しない)</label>
+<label><input type="radio" name="q17" value="a17-2">1~3ヶ月(女性の場合産後休暇8週間+育休1ヶ月半以内)</label>
+<label><input type="radio" name="q17" value="a17-3">3ヶ月~保育園入るまで</label>
+<label><input type="radio" name="q17" value="a17-4">1~2年</label>
+<label><input type="radio" name="q17" value="a17-5">相手に頼まれなければ取るつもりはない</label>
+<label><input type="radio" name="q17" value="a17-6">子どもが生まれたら仕事をやめたい</label>
+<label><input type="radio" name="q17" value="a17-7">その他</label>
+<textarea id="q17_other" class="detail-textarea" style="display:none"></textarea>
+
+<!-- Q18 -->
+<label>Q18 子どもが生まれた後の支出割合はどうしたいですか？</label>
+<label><input type="radio" name="q18" value="a18-1">共通でかかるお金は自分がほとんど払いたい</label>
+<label><input type="radio" name="q18" value="a18-2">収入差による按分で出し合いたい</label>
+<label><input type="radio" name="q18" value="a18-3">半々で出し合いたい</label>
+<label><input type="radio" name="q18" value="a18-4">共通でかかるお金は相手にほとんど払ってほしい</label>
+<label><input type="radio" name="q18" value="a18-5">その他</label>
+<textarea id="q18_other" class="detail-textarea" style="display:none"></textarea>
+
+<!-- Q19 -->
+<label>Q19 次の家事の中で好きな順に選択してください。</label>
+<div id="q19Ranking" class="ranking-group">
+  <button type="button" class="rank-option" data-value="料理"><span class="rank-number"></span>料理</button>
+  <button type="button" class="rank-option" data-value="洗い物"><span class="rank-number"></span>洗い物</button>
+  <button type="button" class="rank-option" data-value="掃除機をかける"><span class="rank-number"></span>掃除機をかける</button>
+  <button type="button" class="rank-option" data-value="水回りの掃除"><span class="rank-number"></span>水回りの掃除</button>
+  <button type="button" class="rank-option" data-value="片付け"><span class="rank-number"></span>片付け</button>
+  <button type="button" class="rank-option" data-value="洗濯機をまわしてから干すまで"><span class="rank-number"></span>洗濯機をまわしてから干すまで</button>
+  <button type="button" class="rank-option" data-value="干したものの取り込み"><span class="rank-number"></span>干したものの取り込み</button>
+  <button type="button" class="rank-option" data-value="ゴミ捨て"><span class="rank-number"></span>ゴミ捨て</button>
+</div>
+
+<!-- Q20 -->
+<label>Q20 部屋や水回りの清潔感はどのくらい気になりますか？</label>
+<div class="slider-labels">
+  <span>気にしない</span>
+  <span>気になる</span>
+</div>
+<input type="range" id="q20" min="1" max="5" step="1">
+
+<!-- Q21 -->
+<label>Q21 洗濯頻度は普段どのくらいですか？</label>
+<label><input type="radio" name="q21" value="a21-1">週3回以上</label>
+<label><input type="radio" name="q21" value="a21-2">週1〜2回</label>
+<label><input type="radio" name="q21" value="a21-3">週1回未満</label>
+
+<!-- Q22 -->
+<label>Q22 掃除頻度は普段どのくらいですか？</label>
+<label><input type="radio" name="q22" value="a22-1">毎日</label>
+<label><input type="radio" name="q22" value="a22-2">週1回以上</label>
+<label><input type="radio" name="q22" value="a22-3">月1回以上</label>
+<label><input type="radio" name="q22" value="a22-4">1シーズンに1回以上</label>
+<label><input type="radio" name="q22" value="a22-5">あまりしない</label>
+
+<!-- Q23 -->
+<label>Q23 自炊派ですか？外食はしますか？自炊と惣菜を併用している場合は自炊に含んでください。</label>
+<label><input type="radio" name="q23" value="a23-1">毎日自炊する</label>
+<label><input type="radio" name="q23" value="a23-2">週末などに作り置きして自炊したものを毎日食べている</label>
+<label><input type="radio" name="q23" value="a23-3">週の半分程度は外食または弁当を買って食べる</label>
+<label><input type="radio" name="q23" value="a23-4">ほぼ毎日外食または弁当を買って食べる</label>
+
+<!-- Q24 -->
+<label>Q24 食器を洗うタイミングは普段どのくらいですか？</label>
+<label><input type="radio" name="q24" value="a24-1">食後すぐ</label>
+<label><input type="radio" name="q24" value="a24-2">少し溜まってから</label>
+<label><input type="radio" name="q24" value="a24-3">夕食の食器を翌朝洗うのも気にならない</label>
+
+<!-- Q25 -->
+<label>Q25 便利家電や惣菜へのこだわりはありますか？</label>
+<label><input type="radio" name="q25" value="a25-1">できるだけ避けるべきだ</label>
+<label><input type="radio" name="q25" value="a25-2">惣菜はいいが便利家電は避けたい</label>
+<label><input type="radio" name="q25" value="a25-3">便利家電はいいが惣菜は避けたい</label>
+<label><input type="radio" name="q25" value="a25-4">理想は手間ひまかけて家事を行いたいが、どちらも場合に応じて使っても良い</label>
+<label><input type="radio" name="q25" value="a25-5">予算などがあれば積極的に使いたい</label>
+
+<!-- Q26 -->
+<label>Q26 飲み会の頻度について教えてください。</label>
+<label><input type="radio" name="q26" value="a26-1">ほぼ毎日</label>
+<label><input type="radio" name="q26" value="a26-2">週の半分程度</label>
+<label><input type="radio" name="q26" value="a26-3">週1〜2回程度</label>
+<label><input type="radio" name="q26" value="a26-4">月3回以上</label>
+<label><input type="radio" name="q26" value="a26-5">月1〜2回程度</label>
+<label><input type="radio" name="q26" value="a26-6">1シーズンに1回以上</label>
+<label><input type="radio" name="q26" value="a26-7">年1〜2回程度</label>
+<label><input type="radio" name="q26" value="a26-8">ほとんどない</label>
+
+<!-- Q27 -->
+<label>Q27 家で晩酌はしますか？</label>
+<label><input type="radio" name="q27" value="a27-1">毎日</label>
+<label><input type="radio" name="q27" value="a27-2">週の半分程度</label>
+<label><input type="radio" name="q27" value="a27-3">週1〜2回程度</label>
+<label><input type="radio" name="q27" value="a27-4">習慣化はしていないが気が向いたらする</label>
+<label><input type="radio" name="q27" value="a27-5">しない</label>
+
+<!-- Q28 -->
+<label>Q28 家は買いたいですか？許容範囲のもの全て選んでください。</label>
+<label><input type="checkbox" name="q28" value="a28-1">ずっと賃貸</label>
+<label><input type="checkbox" name="q28" value="a28-2">将来的には持ち家を買いたい</label>
+<label><input type="checkbox" name="q28" value="a28-3">すでに持ち家を持っている</label>
+<label><input type="checkbox" name="q28" value="a28-4">今は賃貸だが将来や相続後は自分の実家に住む</label>
+<label><input type="checkbox" name="q28" value="a28-5">今は賃貸だが将来や相続後は義実家に住む</label>
+<label><input type="checkbox" name="q28" value="a28-6">社宅などその他</label>
+
+<!-- Q29 -->
+<label>Q29 戸建て、マンションについて、どれが良いですか？許容範囲のもの全て選んでください。</label>
+<label><input type="checkbox" name="q29" value="a29-1">注文住宅で戸建て</label>
+<label><input type="checkbox" name="q29" value="a29-2">中古の戸建て</label>
+<label><input type="checkbox" name="q29" value="a29-3">新築マンション</label>
+<label><input type="checkbox" name="q29" value="a29-4">中古マンション</label>
+
+<!-- Q30 -->
+<label>Q30 家について、予算と住みたいエリアにこだわりがあれば教えてください。</label>
+<textarea id="q30_budget" class="detail-textarea" placeholder="予算"></textarea>
+<textarea id="q30_area" class="detail-textarea" placeholder="エリア"></textarea>
+
+<!-- Q31 -->
+<label>Q31 車は買いたいですか？</label>
+<label><input type="radio" name="q31" value="a31-1">すでにファミリー使いできる車を持っている</label>
+<label><input type="radio" name="q31" value="a31-2">車は持っているがファミリー用ではないため将来的にはファミリー用を買いたい</label>
+<label><input type="radio" name="q31" value="a31-3">今は車を持っていないが将来的には車を買いたい</label>
+<label><input type="radio" name="q31" value="a31-4">カーシェアをサブスク契約したい</label>
+<label><input type="radio" name="q31" value="a31-5">旅行の時など必要なときだけ借りればよい</label>
+<label><input type="radio" name="q31" value="a31-6">免許を持っていない、車は運転するつもりがない</label>
+
+<!-- Q32 -->
+<label>Q32 ペットは飼いたいですか？ 飼いたい場合は何の生き物を飼いたいか教えてください。</label>
+<div class="slider-labels">
+  <span>飼いたくない</span>
+  <span>飼いたい</span>
+</div>
+<input type="range" id="q32" min="1" max="5" step="1">
+<textarea id="q32_pet" class="detail-textarea" placeholder="飼いたいペット"></textarea>
+
+<!-- Q33 -->
+<label>Q33 両親・兄弟とは年何回ぐらい会いますか？ 結婚後の希望ではなく現在の状況を教えてください。</label>
+<label><input type="radio" name="q33" value="a33-1">月1回以上</label>
+<label><input type="radio" name="q33" value="a33-2">数ヶ月に1回~年に数回</label>
+<label><input type="radio" name="q33" value="a33-3">年に1回あるかないか</label>
+<label><input type="radio" name="q33" value="a33-4">法事などの必要に迫られた時のみ</label>
+
+<!-- Q34 -->
+<label>Q34 家族以外の親戚とは年何回ぐらい会いますか？ 結婚後の希望ではなく現在の状況を教えてください。</label>
+<label><input type="radio" name="q34" value="a34-1">月1回以上</label>
+<label><input type="radio" name="q34" value="a34-2">数ヶ月に1回~年に数回</label>
+<label><input type="radio" name="q34" value="a34-3">年に1回あるかないか</label>
+<label><input type="radio" name="q34" value="a34-4">法事などの必要に迫られた時のみ</label>
+
+<!-- Q35 -->
+<label>Q35 結婚後、両親・兄弟とは年何回ぐらい会いたいですか？義両親ではなく、ご自身の家族との会いたい頻度を教えてください。</label>
+<label><input type="radio" name="q35" value="a35-1">月1回以上</label>
+<label><input type="radio" name="q35" value="a35-2">数ヶ月に1回~年に数回</label>
+<label><input type="radio" name="q35" value="a35-3">年に1回あるかないか</label>
+<label><input type="radio" name="q35" value="a35-4">法事などの必要に迫られた時のみ</label>
+
+<!-- Q36 -->
+<label>Q36 結婚後、自身の両親・兄弟と会う時、パートナーにはついてきてほしいですか？</label>
+<label><input type="radio" name="q36" value="a36-1">毎回一緒に会いたい</label>
+<label><input type="radio" name="q36" value="a36-2">毎回ではないが2回に1回ぐらいはついてきてほしい</label>
+<label><input type="radio" name="q36" value="a36-3">義実家に泊まる時はついてきてほしい</label>
+<label><input type="radio" name="q36" value="a36-4">宿泊はしなくてもよいが、たまにはついてきてほしい</label>
+<label><input type="radio" name="q36" value="a36-5">ついてこないでほしい</label>
+
+<!-- Q37 -->
+<label>Q37 結婚後、義両親・義兄弟とは年何回ぐらい会いたいですか？</label>
+<label><input type="radio" name="q37" value="a37-1">月1回以上</label>
+<label><input type="radio" name="q37" value="a37-2">数ヶ月に1回~年に数回</label>
+<label><input type="radio" name="q37" value="a37-3">年に1回あるかないか</label>
+<label><input type="radio" name="q37" value="a37-4">法事などの必要に迫られた時のみ</label>
+
+<!-- Q38 -->
+<label>Q38 苗字についてこだわりはありますか？</label>
+<label><input type="radio" name="q38" value="a38-1">できれば相手に変えてほしい</label>
+<label><input type="radio" name="q38" value="a38-2">できれば相手の苗字に変えたい</label>
+<label><input type="radio" name="q38" value="a38-3">どちらでもよい、相手の希望次第で考えたい</label>
+
+<!-- Q39 -->
+<label>Q39 結婚費用について（結婚指輪や結婚式、新婚旅行などにかける費用）どう考えていますか？</label>
+<label><input type="radio" name="q39" value="a39-1">予算のある限り積極的に使いたい</label>
+<label><input type="radio" name="q39" value="a39-2">相手が望むのであればかけてもよい</label>
+<label><input type="radio" name="q39" value="a39-3">結婚費用はあまりかけず、将来の生活費や貯蓄にとっておきたい</label>
+
+<!-- Q40 -->
+<label>Q40 日常生活では、お互いにどの程度気を遣い続けたいですか？</label>
+<label><input type="radio" name="q40" value="a40-1">身だしなみや言葉遣いなども含め、常に気を遣いたい</label>
+<label><input type="radio" name="q40" value="a40-2">基本的には気を遣いたいが、ある程度は自然体でもよい</label>
+<label><input type="radio" name="q40" value="a40-3">お互い飾らず、何でも自然体でいたい</label>
+
+<!-- Q41 -->
+<label>Q41 パートナーとの間で、これをされるのは嫌だというものはどれですか？全て選んでください。</label>
+<label><input type="checkbox" name="q41" value="a41-1">風呂に入る前にベッドでそのままダラダラする</label>
+<label><input type="checkbox" name="q41" value="a41-2">おならやゲップをする</label>
+<label><input type="checkbox" name="q41" value="a41-3">脱いだ服をそのまま置いておく</label>
+<label><input type="checkbox" name="q41" value="a41-4">自身が買ってきて冷蔵庫などに保管していた食べ物、飲み物をパートナーが許可なく食べられる、飲まれる</label>
+<label><input type="checkbox" name="q41" value="a41-5">スマホを勝手に見られる（ロック画面の通知内容含め）</label>
+<label><input type="checkbox" name="q41" value="a41-6">下ネタを話す</label>
+<label><input type="checkbox" name="q41" value="a41-7">ノリで「お前」と言われる</label>
+<label><input type="checkbox" name="q41" value="a41-8">芸能人の不倫などのゴシップを聞かされる</label>
+<label><input type="checkbox" name="q41" value="a41-9">政治や経済について議論する</label>
+<label><input type="checkbox" name="q41" value="a41-10">仕事の愚痴を頻繁に聞かされる</label>
+<label><input type="checkbox" name="q41" value="a41-11">共通の趣味ではない趣味について聞かされる</label>
+<label><input type="checkbox" name="q41" value="a41-12">共通の友人でない人の話（ポジティブな話題もネガティブな話題も問わず）を頻繁に聞かされる</label>
+<label><input type="checkbox" name="q41" value="a41-13">異性の同僚や友人との出来事について聞かされる</label>
+<label><input type="checkbox" name="q41" value="a41-14">異性からナンパされた、2人で食事に誘われたことなどを相手から言わないままにされる</label>
+  
+<div class="button-group">
+  <button id="submitBtn" type="button">送信</button>
+  <div class="sub-buttons">
+    <button id="draftBtn" type="button">下書き保存</button>
+    <button id="clearBtn" type="button">フォームクリア</button>
+  </div>
+</div>
+
+<!-- 共有モーダル -->
+<div id="shareModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>共有</h3>
+    <input id="shareName" placeholder="お名前を入力してください（任意）">
+    <button id="shareBtn">共有する</button>
+  </div>
+</div>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>
