@@ -1,5 +1,5 @@
 /* ============================================================
-   婚活 すり合わせ – app.js
+   価値観 すり合わせ – app.js
    ------------------------------------------------------------
    共有リンクは「id（短いランダムID）＋復号鍵（URLのフラグメント）」
    のみで構成される。回答本体は暗号化されたうえで GAS 経由で
@@ -916,7 +916,7 @@ function renderViewMode(data, options = {}) {
       <div class="cta-content">
         <h3 class="cta-title">あなたの価値観も共有してみませんか？</h3>
         <p class="cta-text">
-          婚活・交際前の自己開示は、<br>
+          価値観のすり合わせは、<br>
           お互いを知る大切なきっかけになります。<br>
           あなたの考えや価値観をアンケートで伝えてみましょう。
         </p>
@@ -939,7 +939,7 @@ function renderViewMode(data, options = {}) {
   const ctaButton = document.getElementById("ctaButton");
   if (ctaButton) {
     ctaButton.addEventListener("click", () => {
-      if (confirm("婚活 すり合わせフォームを開く")) {
+      if (confirm("価値観 すり合わせフォームを開く")) {
         window.location.href = ctaButton.dataset.href;
       }
     });
@@ -966,7 +966,7 @@ function buildShareFlexMessage(shareName, shareURL) {
 
   return {
     type: "flex",
-    altText: `婚活 すり合わせ - ${nameLine}`,
+    altText: `価値観 すり合わせ - ${nameLine}`,
     contents: {
       type: "bubble",
       hero: {
@@ -982,7 +982,7 @@ function buildShareFlexMessage(shareName, shareURL) {
         spacing: "md",
         paddingAll: "20px",
         contents: [
-          { type: "text", text: "婚活 すり合わせ", size: "xs", weight: "bold", color: "#d96c7d" },
+          { type: "text", text: "価値観 すり合わせ", size: "xs", weight: "bold", color: "#d96c7d" },
           { type: "text", text: nameLine, size: "lg", weight: "bold", wrap: true, margin: "sm" },
           { type: "text", text: "ボタンから回答内容を確認できます。", size: "sm", color: "#888888", wrap: true, margin: "md" }
         ]
@@ -1118,7 +1118,7 @@ async function checkFriendship() {
 
 /* ============================================================
    複数アプリ一括下書き移行チェーン 受け取り処理
-   （婚活すり合わせシリーズ 5サイト共通スニペット。中身は全サイト同一）
+   （価値観すり合わせシリーズ 5サイト共通スニペット。中身は全サイト同一）
    ============================================================ */
 (function () {
   const params = new URLSearchParams(location.search);
@@ -1380,8 +1380,8 @@ async function handleShare(data, shareName) {
   const shareURL = `${base}?id=${id}#${keyBase64}`;
 
   const previewMsg = shareName
-    ? `${shareName}さんの婚活 すり合わせの回答が届きました。\n回答をみる→${shareURL}`
-    : `婚活 すり合わせの回答が届きました。\n回答をみる→${shareURL}`;
+    ? `${shareName}さんの価値観 すり合わせの回答が届きました。\n回答をみる→${shareURL}`
+    : `価値観 すり合わせの回答が届きました。\n回答をみる→${shareURL}`;
 
   const flexMessage = buildShareFlexMessage(shareName, shareURL);
 
