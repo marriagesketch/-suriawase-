@@ -557,48 +557,6 @@ function restoreFormData(data) {
 }
 
 /* ============================================================
-   バリデーション
-   ============================================================ */
-function validate(data) {
-  const errors = [];
-  if (!data.q1.trim())  errors.push("Q1: 結婚したい理由を入力してください。");
-  if (!data.q2.trim())  errors.push("Q2: 理想の夫婦像を入力してください。");
-  if (!data.q3)         errors.push("Q3: 前科について選択してください。");
-  if (!data.q4)         errors.push("Q4: 借金について選択してください。");
-  if (!data.q5)         errors.push("Q5: 保証人について選択してください。");
-  if (!data.q6)         errors.push("Q6: 健康上のことについて選択してください。");
-  if (!data.q7)         errors.push("Q7: 宗教事情について選択してください。");
-  if (!data.q8)         errors.push("Q8: 初婚・再婚について選択してください。");
-  if (!data.q9)         errors.push("Q9: 転勤・転職・起業について選択してください。");
-  if (!data.q11)        errors.push("Q11: ブライダルチェックについて選択してください。");
-  if (!data.q12)        errors.push("Q12: 結婚後の働き方を選択してください。");
-  if (!data.q13)        errors.push("Q13: 家事の分担について選択してください。");
-  if (!data.q14)        errors.push("Q14: 結婚後の支出割合を選択してください。");
-  if (!data.q15)        errors.push("Q15: 子ども後の働き方を選択してください。");
-  if (!data.q16)        errors.push("Q16: 育児の分担について選択してください。");
-  if (!data.q17)        errors.push("Q17: 育休について選択してください。");
-  if (!data.q18)        errors.push("Q18: 子ども後の支出割合を選択してください。");
-  if (!data.q21)        errors.push("Q21: 洗濯頻度を選択してください。");
-  if (!data.q22)        errors.push("Q22: 掃除頻度を選択してください。");
-  if (!data.q23)        errors.push("Q23: 自炊・外食について選択してください。");
-  if (!data.q24)        errors.push("Q24: 食器を洗うタイミングを選択してください。");
-  if (!data.q25)        errors.push("Q25: 便利家電・惣菜について選択してください。");
-  if (!data.q26)        errors.push("Q26: 飲み会の頻度を選択してください。");
-  if (!data.q27)        errors.push("Q27: 晩酌について選択してください。");
-  if (!data.q28 || data.q28.length === 0) errors.push("Q28: 家について選択してください。");
-  if (!data.q33)        errors.push("Q33: 両親・兄弟との面会頻度（現在）を選択してください。");
-  if (!data.q34)        errors.push("Q34: 親戚との面会頻度（現在）を選択してください。");
-  if (!data.q35)        errors.push("Q35: 結婚後の両親・兄弟との面会頻度を選択してください。");
-  if (!data.q36)        errors.push("Q36: パートナーの同行について選択してください。");
-  if (!data.q37)        errors.push("Q37: 義両親との面会頻度を選択してください。");
-  if (!data.q38)        errors.push("Q38: 苗字についてのこだわりを選択してください。");
-  if (!data.q39)        errors.push("Q39: 結婚費用についての考えを選択してください。");
-  if (!data.q40)        errors.push("Q40: 日常生活で気を遣う程度について選択してください。");
-  if (!data.q41 || data.q41.length === 0) errors.push("Q41: パートナーとの間で嫌なことを選択してください。");
-  return errors;
-}
-
-/* ============================================================
    統計用データの抽出（Analyticsシート行）
    Analyticsシートに列がある項目のみを平文で送る。
    ※ q6（健康上のことで伝えておくこと）は個人特定性が高いため対象外。
@@ -1325,13 +1283,7 @@ async function checkFriendship() {
 
   /* ----- 送信ボタン ----- */
   document.getElementById("submitBtn").addEventListener("click", () => {
-    const data   = collectFormData();
-    const errors = validate(data);
-
-    if (errors.length > 0) {
-      alert("以下の項目を入力・選択してください。\n\n" + errors.join("\n"));
-      return;
-    }
+    const data = collectFormData();
 
     try { localStorage.setItem(DRAFT_KEY, JSON.stringify(data)); } catch (_) {}
 
