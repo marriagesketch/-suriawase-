@@ -10,6 +10,10 @@
 const LIFF_ID   = "2010312230-eMR5533o";
 const DRAFT_KEY = "konkatsu_suriawase_draft";
 const PENDING_SHARED_VIEW_KEY = "konkatsu_suriawase_pending_shared_view";
+// 「クリア」した時刻。これ以前のクラウド下書きは自動復元しない（意図的なクリアを尊重するため）
+const DRAFT_CLEARED_AT_KEY = "konkatsu_suriawase_draft_cleared_at";
+// クラウド下書きの暗号鍵導出用（LINEユーザーIDと組み合わせる）。変更すると過去のクラウド下書きは復号できなくなる
+const DRAFT_CRYPTO_SALT = "konkatsu_suriawase_draft_key_v1:";
 
 // ▼▼▼ デプロイ済みGAS Web AppのURL ▼▼▼
 const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbzyvzON4-aCxsV1T37MZhDpIvHj-bGhC2ODfHiSgRifompdUN7o_XYivh2VErYMm-v0/exec";
@@ -556,6 +560,201 @@ function restoreFormData(data) {
   restoreRankingGroup("q19Ranking", data.q19);
 }
 
+/* ------------------------------------------------------------
+   「その他」選択時だけ表示する自由記述欄の表示状態を、現在の選択に合わせる
+   （下書き復元・クラウド復元・クリアの後に呼ぶ）
+   ------------------------------------------------------------ */
+function syncConditionalFields() {
+  [
+    { name: "q8",  otherId: "q8_other",  otherVal: "a8-2" },
+    { name: "q12", otherId: "q12_other", otherVal: "a12-6" },
+    { name: "q13", otherId: "q13_other", otherVal: "a13-7" },
+    { name: "q14", otherId: "q14_other", otherVal: "a14-5" },
+    { name: "q15", otherId: "q15_other", otherVal: "a15-6" },
+    { name: "q16", otherId: "q16_other", otherVal: "a16-6" },
+    { name: "q17", otherId: "q17_other", otherVal: "a17-7" },
+    { name: "q18", otherId: "q18_other", otherVal: "a18-5" },
+  ].forEach(({ name, otherId, otherVal }) => {
+    const checked = document.querySelector(`input[name="${name}"]:checked`);
+    toggleDetail(otherId, checked ? checked.value === otherVal : false);
+  });
+}
+
+/* ------------------------------------------------------------
+   フォームの初期化（クリアボタン／クラウド下書きで置き換える時に使用）
+   ------------------------------------------------------------ */
+function resetFormFields() {
+  ["q1","q2","q8_other","q12_other","q13_other","q14_other","q15_other",
+   "q16_other","q17_other","q18_other","q30_budget","q30_area","q32_pet"]
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+
+  document.querySelectorAll('input[type="radio"], input[type="checkbox"]')
+    .forEach(el => (el.checked = false));
+
+  ["q10_1","q10_2","q10_3","q10_4","q20","q32"]
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = 3; });
+
+  resetRankingGroup("q19Ranking");
+  syncConditionalFields();
+}
+
+/* ============================================================
+   下書き：二段構え
+   ① 自動保存 … 入力のたびに端末（localStorage）へ保存
+   ② 「下書き保存」ボタン … 端末 ＋ クラウド（GAS）へ保存
+   端末側のデータが消えても、クラウド側から自動復元する。
+   クラウド側は「LINEユーザーID由来の鍵」で暗号化してから送るため、
+   サーバー側では内容を読めない（共有リンクと同じ考え方）。
+   ============================================================ */
+
+/* 入力が空（初期状態）かどうか。空の状態で既存の下書きを上書きしないために使う
+   ※スライダーの初期値は 3（クリアボタンの初期化値と同じ） */
+function isBlankForm(d) {
+  if (!d) return true;
+  const textKeys = ["q1","q2","q8_other","q12_other","q13_other","q14_other","q15_other",
+                    "q16_other","q17_other","q18_other","q30_budget","q30_area","q32_pet"];
+  const radioKeys = ["q3","q4","q5","q6","q7","q8","q9","q11","q12","q13","q14","q15",
+                     "q16","q17","q18","q21","q22","q23","q24","q25","q26","q27",
+                     "q31","q33","q34","q35","q36","q37","q38","q39","q40"];
+  const listKeys = ["q10_1_chk","q10_2_chk","q10_3_chk","q10_4_chk","q19","q28","q29","q41"];
+  const sliderKeys = ["q10_1_val","q10_2_val","q10_3_val","q10_4_val","q20","q32"];
+  if (textKeys.some(key => String(d[key] || "").trim() !== "")) return false;
+  if (radioKeys.some(key => d[key])) return false;
+  if (listKeys.some(key => Array.isArray(d[key]) && d[key].length > 0)) return false;
+  if (sliderKeys.some(key => String(d[key] || 3) !== "3")) return false;
+  return true;
+}
+
+/* ----- 端末（localStorage） ----- */
+function readLocalDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.v === 2 && parsed.data) {
+      return { data: parsed.data, savedAt: Number(parsed.savedAt) || 0 };
+    }
+    return { data: parsed, savedAt: 0 }; // 旧形式（フォーム値そのまま）との互換
+  } catch (e) {
+    console.warn("local draft read failed:", e);
+    return null;
+  }
+}
+
+function writeLocalDraft(data, savedAt = Date.now()) {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ v: 2, savedAt, data }));
+    return true;
+  } catch (e) {
+    console.warn("local draft write failed:", e);
+    return false;
+  }
+}
+
+function getDraftClearedAt() {
+  try { return Number(localStorage.getItem(DRAFT_CLEARED_AT_KEY)) || 0; } catch (_) { return 0; }
+}
+function setDraftClearedAt(ts) {
+  try { localStorage.setItem(DRAFT_CLEARED_AT_KEY, String(ts)); } catch (_) {}
+}
+
+/* ----- クラウド（GAS） ----- */
+function fetchWithTimeout(url, options = {}, ms = 15000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
+
+// 鍵は「ソルト＋LINEユーザーID」のSHA-256。サーバーが持つのはユーザーIDのハッシュ（ownerHash）だけで、
+// この鍵は導出できない。
+async function getDraftCryptoKey(userId) {
+  const raw = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(DRAFT_CRYPTO_SALT + userId));
+  return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+
+async function saveCloudDraft(data, savedAt = Date.now()) {
+  const userId     = getLineUserId();
+  const ownerHash  = await sha256Hex(userId);
+  const key        = await getDraftCryptoKey(userId);
+  const cipherText = await encryptJSON(data, key);
+
+  const resp = await fetchWithTimeout(GAS_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" }, // preflight回避
+    body: JSON.stringify({ action: "saveDraft", ownerHash, cipherText, savedAt, schemaVersion: 1 }),
+  });
+  const result = await resp.json();
+  if (!result.ok) throw new Error(result.reason || "save_draft_failed");
+  return savedAt;
+}
+
+async function loadCloudDraft() {
+  const userId    = getLineUserId();
+  const ownerHash = await sha256Hex(userId);
+  const key       = await getDraftCryptoKey(userId);
+
+  const url  = `${GAS_ENDPOINT}?action=loadDraft&ownerHash=${encodeURIComponent(ownerHash)}`;
+  const resp = await fetchWithTimeout(url, { method: "GET" });
+  const result = await resp.json();
+  if (!result.ok) {
+    if (result.reason === "not_found") return null;
+    throw new Error(result.reason || "load_draft_failed");
+  }
+  const data = await decryptJSON(result.cipherText, key);
+  return { data, savedAt: Number(result.savedAt) || 0 };
+}
+
+/* ----- 起動時：クラウドの下書きを確認して必要なら復元（画面表示はブロックしない） ----- */
+async function syncCloudDraft(localDraft) {
+  let cloud;
+  try {
+    cloud = await loadCloudDraft();
+  } catch (e) {
+    console.warn("cloud draft load skipped:", e);
+    return;
+  }
+  if (!cloud || isBlankForm(cloud.data)) return;
+  if (cloud.savedAt <= getDraftClearedAt()) return; // クリア済み
+
+  const current = collectFormData();
+
+  // 端末側が空（端末のデータが消えた／新しい端末）→ 自動で復元
+  if (isBlankForm(current)) {
+    resetFormFields();
+    restoreFormData(cloud.data);
+    syncConditionalFields();
+    writeLocalDraft(cloud.data, cloud.savedAt);
+    return;
+  }
+
+  // 端末側にも入力あり。クラウドの方が新しく、内容も違う場合だけ確認する
+  const localAt = localDraft ? localDraft.savedAt : 0;
+  if (cloud.savedAt > localAt + 1000 && JSON.stringify(cloud.data) !== JSON.stringify(current)) {
+    if (confirm("クラウドに、この端末より新しい下書きが保存されています。読み込みますか？\n（読み込むと、いま画面にある入力内容は置き換わります）")) {
+      resetFormFields();
+      restoreFormData(cloud.data);
+      syncConditionalFields();
+      writeLocalDraft(cloud.data, cloud.savedAt);
+    }
+  }
+}
+
+/* ----- 送信済みの回答を、自分の下書きとして復元する（共有リンクの所有者のみ） ----- */
+async function restoreDraftFromSharedAnswer(sharedData) {
+  if (!confirm("この回答を、自分の下書きとして復元します。\n現在保存されている下書きは上書きされます。よろしいですか？")) return;
+
+  const { _shareName, ...formData } = sharedData; // 共有時の表示名は下書きに含めない
+  const savedAt = Date.now();
+  writeLocalDraft(formData, savedAt);
+  try {
+    await saveCloudDraft(formData, savedAt);
+  } catch (e) {
+    console.warn("cloud save during restore failed:", e);
+  }
+  alert("下書きとして復元しました。回答フォームを開きます。");
+  location.href = location.href.split("?")[0].split("#")[0];
+}
+
 /* ============================================================
    統計用データの抽出（Analyticsシート行）
    Analyticsシートに列がある項目のみを平文で送る。
@@ -748,7 +947,10 @@ async function handleSharedView(id) {
     return;
   }
 
-  renderViewMode(data);
+  // GAS側が isOwner: true を返した場合（閲覧者＝共有を作成した本人）のみ、下書き復元ボタンを出す
+  renderViewMode(data, result.isOwner === true
+    ? { onRestoreDraft: () => restoreDraftFromSharedAnswer(data) }
+    : {});
   showScreenshotWatermark(viewerHash);
 }
 
@@ -756,7 +958,7 @@ async function handleSharedView(id) {
    ビューモード：回答をカード表示
    ============================================================ */
 function renderViewMode(data, options = {}) {
-  const { selfPreview = false, onShare = null } = options;
+  const { selfPreview = false, onShare = null, onRestoreDraft = null } = options;
 
   const r = (val) => val || "未回答";
   const radioWithOther = (val, other) => {
@@ -897,6 +1099,19 @@ function renderViewMode(data, options = {}) {
       <p class="view-label">回答内容</p>
       ${data._shareName ? `<p class="view-name">${escapeHTML(data._shareName)} さんの回答</p>` : ""}
     </div>
+    ${(!selfPreview && onRestoreDraft) ? `
+    <div class="cta-card share-confirm-card">
+      <div class="cta-content" style="text-align:center;">
+        <h3 class="cta-title">あなたが送信した回答です</h3>
+        <p class="cta-text">
+          この回答を、自分の下書きとして復元できます。
+        </p>
+        <button type="button" id="restoreDraftBtn" class="cta-button">
+          下書きとして復元する <span class="cta-arrow">›</span>
+        </button>
+      </div>
+    </div>
+    ` : ""}
     `}
 
     ${rows.map(({ q, a, html }) => `
@@ -930,6 +1145,11 @@ function renderViewMode(data, options = {}) {
       goShareBtn.addEventListener("click", onShare);
     }
     return;
+  }
+
+  const restoreDraftBtn = document.getElementById("restoreDraftBtn");
+  if (restoreDraftBtn && typeof onRestoreDraft === "function") {
+    restoreDraftBtn.addEventListener("click", onRestoreDraft);
   }
 
   const ctaButton = document.getElementById("ctaButton");
@@ -1113,53 +1333,9 @@ async function checkFriendship() {
 }
 
 /* ============================================================
-   複数アプリ一括下書き移行チェーン 受け取り処理
-   （価値観すり合わせシリーズ 5サイト共通スニペット。中身は全サイト同一）
-   ============================================================ */
-(function () {
-  const params = new URLSearchParams(location.search);
-  if (params.get("migrate") !== "1" || !location.hash) return;
-
-  window.__migrationInProgress = true;
-
-  try {
-    const idx = parseInt(params.get("idx") || "0", 10);
-    const encoded = location.hash.slice(1);
-    const binary = atob(encoded.replace(/-/g, "+").replace(/_/g, "/"));
-    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
-    const chain = JSON.parse(new TextDecoder().decode(bytes));
-
-    const item = chain[idx];
-    if (item && item.value != null) {
-      localStorage.setItem(item.draftKey, item.value);
-    }
-
-    const next = chain[idx + 1];
-    if (next) {
-      // まだ移行先が残っている → 次のサイトへ自動遷移
-      location.href = `${next.targetOrigin}?migrate=1&idx=${idx + 1}#${encoded}`;
-    } else {
-      // チェーンの最後 = 全件移行完了
-      alert("下書きデータの移行がすべて完了しました。");
-      history.replaceState(null, "", location.origin + location.pathname);
-      window.__migrationInProgress = false;
-    }
-  } catch (e) {
-    console.error("draft migration failed", e);
-    alert("下書きデータの移行中にエラーが発生しました。お手数ですが運営までご連絡ください。");
-    history.replaceState(null, "", location.origin + location.pathname);
-    window.__migrationInProgress = false;
-  }
-})();
-
-/* ============================================================
    メイン処理
    ============================================================ */
 (async () => {
-
-  // 移行チェーンの転送中（次サイトへの中継のみ）は、
-  // 通常のLIFF初期化・アプリ本処理を一切実行しない
-  if (window.__migrationInProgress) return;
 
   /* ----- LIFF 初期化（必ず最初に1回だけ実行） -----
      共有リンク判定に使うURL（?id=...#key）の読み取りは、
@@ -1238,26 +1414,76 @@ async function checkFriendship() {
     );
   });
 
-  /* ----- 下書き復元後の初期表示状態を同期 ----- */
-  const syncToggle = (name, otherId, otherVal) => {
-    const checked = document.querySelector(`input[name="${name}"]:checked`);
-    toggleDetail(otherId, checked ? checked.value === otherVal : false);
-  };
-
-  /* ----- localStorage から下書き復元 ----- */
-  try {
-    const saved = localStorage.getItem(DRAFT_KEY);
-    if (saved) restoreFormData(JSON.parse(saved));
-  } catch (_) {}
-
-  /* ----- 下書き保存 ----- */
-  document.getElementById("draftBtn") &&
-  document.getElementById("draftBtn").addEventListener("click", () => {
+  /* ----- 下書き復元：①端末（localStorage）→ ②クラウド（裏で確認） ----- */
+  const localDraft = readLocalDraft();
+  if (localDraft) {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(collectFormData()));
-      alert("下書きを保存しました。");
-    } catch (_) {
-      alert("下書きの保存に失敗しました。");
+      restoreFormData(localDraft.data);
+      syncConditionalFields(); // 復元後の「その他」欄の表示状態を揃える
+    } catch (e) {
+      console.warn("local draft restore failed:", e);
+    }
+  }
+
+  /* ----- 自動保存（端末）-----
+     入力のたびに（0.5秒まとめて）端末へ保存。画面を離れる／アプリが
+     バックグラウンドに回る時にも即時保存する。
+     入力が空の状態では保存しない（既存の下書きを空で上書きしないため）。 */
+  let autosaveTimer = null;
+  const flushAutosave = () => {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = null;
+    const data = collectFormData();
+    if (!isBlankForm(data)) writeLocalDraft(data);
+  };
+  const scheduleAutosave = (e) => {
+    if (e && e.target && e.target.closest && e.target.closest("#shareModal")) return;
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(flushAutosave, 500);
+  };
+  document.addEventListener("input", scheduleAutosave);
+  document.addEventListener("change", scheduleAutosave);
+  // ランキングUIは input/change が発火しない独自ボタンなので、クリックでも自動保存を予約する
+  document.addEventListener("click", (e) => {
+    if (e.target && e.target.closest && e.target.closest(".rank-option")) scheduleAutosave(e);
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushAutosave();
+  });
+  window.addEventListener("pagehide", flushAutosave);
+
+  /* ----- クラウドの下書きを確認（裏で実行。画面表示は止めない） ----- */
+  syncCloudDraft(localDraft);
+
+  /* ----- 下書き保存（端末 ＋ クラウド） ----- */
+  document.getElementById("draftBtn") &&
+  document.getElementById("draftBtn").addEventListener("click", async () => {
+    const draftBtn = document.getElementById("draftBtn");
+    const data = collectFormData();
+    if (isBlankForm(data)) {
+      alert("入力内容がまだありません。");
+      return;
+    }
+
+    const savedAt = Date.now();
+    const localOk = writeLocalDraft(data, savedAt);
+
+    const originalLabel = draftBtn.textContent;
+    draftBtn.disabled = true;
+    draftBtn.textContent = "保存中…";
+    try {
+      await saveCloudDraft(data, savedAt);
+      alert(localOk
+        ? "下書きを保存しました。\n（この端末とクラウドの両方に保存されています）"
+        : "クラウドに下書きを保存しました。\n（この端末への保存は失敗しました）");
+    } catch (e) {
+      console.warn("cloud draft save failed:", e);
+      alert(localOk
+        ? "この端末には保存しましたが、クラウドへの保存に失敗しました。\n通信環境を確認して、もう一度お試しください。"
+        : "下書きの保存に失敗しました。通信環境を確認して、もう一度お試しください。");
+    } finally {
+      draftBtn.disabled = false;
+      draftBtn.textContent = originalLabel;
     }
   });
 
@@ -1265,27 +1491,18 @@ async function checkFriendship() {
   document.getElementById("clearBtn") &&
   document.getElementById("clearBtn").addEventListener("click", () => {
     if (!confirm("入力内容をすべてクリアしますか？")) return;
-
-    ["q1","q2","q8_other","q12_other","q13_other","q14_other","q15_other",
-     "q16_other","q17_other","q18_other","q30_budget","q30_area","q32_pet"]
-      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
-
-    document.querySelectorAll('input[type="radio"], input[type="checkbox"]')
-      .forEach(el => (el.checked = false));
-
-    ["q10_1","q10_2","q10_3","q10_4","q20","q32"]
-      .forEach(id => { const el = document.getElementById(id); if (el) el.value = 3; });
-
-    resetRankingGroup("q19Ranking");
-
+    clearTimeout(autosaveTimer);
+    resetFormFields();
     try { localStorage.removeItem(DRAFT_KEY); } catch (_) {}
+    // 意図的なクリア。これ以前に保存したクラウド下書きは、次回起動時に自動復元しない
+    setDraftClearedAt(Date.now());
   });
 
   /* ----- 送信ボタン ----- */
   document.getElementById("submitBtn").addEventListener("click", () => {
     const data = collectFormData();
 
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(data)); } catch (_) {}
+    writeLocalDraft(data);
 
     const modal = document.getElementById("shareModal");
     if (modal) {
@@ -1365,6 +1582,11 @@ async function handleShare(data, shareName) {
   });
   const result = await resp.json();
   if (!result.ok) throw new Error(result.reason || "share_failed");
+
+  // 共有に成功した回答を、クラウドの下書きにも保存しておく（失敗しても共有処理は止めない）。
+  // 端末のデータが消えても、送信済みの回答を下書きとして復元できるようにするため。
+  const { _shareName, ...formData } = data;
+  saveCloudDraft(formData).catch(e => console.warn("cloud draft save after share failed:", e));
 
   const base     = location.href.split("?")[0].split("#")[0];
   const shareURL = `${base}?id=${id}#${keyBase64}`;
