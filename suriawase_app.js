@@ -677,6 +677,14 @@ function fetchWithTimeout(url, options = {}, ms = 15000) {
   return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(timer));
 }
 
+/* GASの起動待ち（コールドスタート）を、本番の通信より前に済ませておくための軽い呼び出し。
+   結果は使わず、失敗しても何もしない。 */
+function warmUpGas() {
+  try {
+    fetchWithTimeout(`${GAS_ENDPOINT}?action=ping`, { method: "GET" }, 10000).catch(() => {});
+  } catch (_) {}
+}
+
 // 鍵は「ソルト＋LINEユーザーID」のSHA-256。サーバーが持つのはユーザーIDのハッシュ（ownerHash）だけで、
 // この鍵は導出できない。
 async function getDraftCryptoKey(userId) {
@@ -1363,6 +1371,7 @@ async function checkFriendship() {
      戻ってきた直後は、URLが一時的に ?liff.state=... の形に
      なっていて ?id=... が正しく読み取れないことがあるため。
   ----- */
+  warmUpGas(); // LIFFの初期化と並行して、GASを先に起こしておく
   try {
     await liff.init({ liffId: LIFF_ID });
   } catch (e) {
@@ -1523,6 +1532,7 @@ async function checkFriendship() {
 
   /* ----- 送信ボタン ----- */
   document.getElementById("submitBtn").addEventListener("click", () => {
+    warmUpGas(); // 共有モーダルの入力中にGASが眠らないよう、念のため起こしておく
     const data = collectFormData();
 
     writeLocalDraft(data);
@@ -1598,18 +1608,56 @@ async function handleShare(data, shareName) {
   const cipherText = await encryptJSON(data, key);
   const analytics  = buildAnalyticsPayload(data);
 
-  const resp = await fetch(GAS_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" }, // preflight回避のため text/plain を使用
-    body: JSON.stringify({ action: "share", id, cipherText, ownerHash, analytics, schemaVersion: 1 }),
-  });
-  const result = await resp.json();
-  if (!result.ok) throw new Error(result.reason || "share_failed");
+  // 共有リンクの id と復号鍵は端末側で作っているため、サーバーへの保存完了を待たなくても
+  // リンクは組み立てられる。保存は裏で進め、画面は先に「回答内容」プレビューへ切り替える。
+  // ※「共有先を選ぶ」ボタンは、保存が終わるまで押せない（保存前にリンクが送られるのを防ぐ）。
+  const sharePayload = JSON.stringify({ action: "share", id, cipherText, ownerHash, analytics, schemaVersion: 1 });
+  const postShare = async () => {
+    const resp = await fetchWithTimeout(GAS_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, // preflight回避のため text/plain を使用
+      body: sharePayload,
+    }, 30000);
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.reason || "share_failed");
+  };
 
   // 共有に成功した回答を、クラウドの下書きにも保存しておく（失敗しても共有処理は止めない）。
   // 端末のデータが消えても、送信済みの回答を下書きとして復元できるようにするため。
   const { _shareName, ...formData } = data;
-  saveCloudDraft(formData).catch(e => console.warn("cloud draft save after share failed:", e));
+  // 保存の状態管理（"saving" → "saved" / "failed"）。「共有先を選ぶ」ボタンの表示を切り替える。
+  let saveState = "saving";
+  const GO_BTN_HTML = '共有先を選ぶ <span class="cta-arrow">›</span>';
+  const updateGoBtn = () => {
+    const btn = document.getElementById("goShareBtn");
+    if (!btn) return;
+    if (saveState === "saving") {
+      btn.disabled = true;
+      btn.textContent = "保存中…";
+    } else if (saveState === "failed") {
+      btn.disabled = false;
+      btn.textContent = "保存に失敗しました。タップして再試行";
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = GO_BTN_HTML;
+    }
+  };
+  const track = (promise) => {
+    saveState = "saving";
+    updateGoBtn();
+    return promise.then(() => {
+      saveState = "saved";
+      // 共有に成功した回答を、クラウドの下書きにも保存しておく（失敗しても共有処理は止めない）。
+      // 端末のデータが消えても、送信済みの回答を下書きとして復元できるようにするため。
+      saveCloudDraft(formData).catch(e => console.warn("cloud draft save after share failed:", e));
+    }).catch(e => {
+      console.error("share save error", e);
+      saveState = "failed";
+    }).finally(updateGoBtn);
+  };
+  // 保存を先に開始する（画面の切り替えを待たせない）
+  const firstSave = postShare();
+  firstSave.catch(() => {}); // 画面描画中に失敗しても「未処理の拒否」にならないようにする
 
   const base     = location.href.split("?")[0].split("#")[0];
   const shareURL = `${base}?id=${id}#${keyBase64}`;
@@ -1623,12 +1671,18 @@ async function handleShare(data, shareName) {
   renderViewMode(data, {
     selfPreview: true,
     onShare: () => {
+      if (saveState === "failed") {
+        track(postShare()); // 保存に失敗していた場合は、同じ内容をもう一度保存する
+        return;
+      }
+      if (saveState !== "saved") return; // 保存中は何もしない（ボタンも押せない状態）
       // LINEの「送信先を選択」画面を開くURLスキーム（フォールバック用）
       const lineShareURL = `https://line.me/R/msg/text/?${encodeURIComponent(previewMsg)}`;
       shareToOthers(flexMessage, lineShareURL);
     },
   });
 
+  track(firstSave); // プレビュー表示後に、保存の完了／失敗をボタンへ反映
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
